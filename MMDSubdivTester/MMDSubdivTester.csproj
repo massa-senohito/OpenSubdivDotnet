@@ -50,6 +50,9 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="SharpDX.Mathematics">
+      <HintPath>..\..\PMXAutoWeight\packages\SharpDX.Mathematics.4.2.0\lib\net40\SharpDX.Mathematics.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Xml.Linq" />
@@ -68,6 +71,10 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\ToSphereMod\SharpDXTest\SharpDXTest\MMDataIO\MMDataIO.csproj">
+      <Project>{1aef787f-b0ed-44b4-b091-6570888a91f7}</Project>
+      <Name>MMDataIO</Name>
+    </ProjectReference>
     <ProjectReference Include="..\OpenSubdivDotnet\OpenSubdivDotnet.vcxproj">
       <Project>{cb30634f-cb7e-4ecb-9ec7-9f554f9faae4}</Project>
       <Name>OpenSubdivDotnet</Name>

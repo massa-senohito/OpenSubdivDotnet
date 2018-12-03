@@ -1,4 +1,5 @@
-﻿using System;
+﻿using SharpDX;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -102,6 +103,10 @@ namespace SharpDXTest
 
 	public static class Util
 	{
+		public static Vec3 ToV3(this Vector3 v )
+		{
+			return new Vec3( v.X , v.Y , v.Z );
+		}
 		public static float Sin( float f )
 		{
 			return ( float )Math.Sin( f );

@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -144,6 +144,7 @@
   <ItemGroup>
     <ClInclude Include="AdaptiveOptionsCs.h" />
     <ClInclude Include="DescripterCs.h" />
+    <ClInclude Include="FVarChannelCs.h" />
     <ClInclude Include="OpenSubdivDotnet.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="stdafx.h" />
@@ -156,6 +157,7 @@
     <ClCompile Include="AdaptiveOptionsCs.cpp" />
     <ClCompile Include="AssemblyInfo.cpp" />
     <ClCompile Include="DescripterCs.cpp" />
+    <ClCompile Include="FVarChannelCs.cpp" />
     <ClCompile Include="OpenSubdivDotnet.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>

@@ -4,6 +4,8 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using MMDataIO.Pmx;
+using SharpDX;
 using SharpDXTest;
 
 namespace MMDSubdivTester
@@ -30,6 +32,95 @@ static int g_vertIndices[24] = { 0, 1, 3, 2,
                                  1, 7, 5, 3,
                                  6, 0, 2, 4 };
 	 */
+
+	class RefineMMD
+	{
+		List<Vector3> Vertexs = new List<Vector3>();
+		List<int> Faces = new List<int>();
+		List<Vector2> UVs = new List<Vector2>();
+
+		List<int> VertOffset = new List<int>( );
+
+		void OnVert( float x , float y , float z )
+		{
+			Vertexs.Add( new Vector3( x , y , z ) );
+		}
+
+		void OnFace( int v0 , int v1 , int v2 )
+		{
+			Faces.Add( v0 );
+			Faces.Add( v1 );
+			Faces.Add( v2 );
+		}
+
+		void OnUV( float u , float v )
+		{
+			UVs.Add( new Vector2( u , v ) );
+		}
+
+		static PmxVertexData MakeVert( Vector3 pos , Vector2 uv )
+		{
+			PmxVertexData pmxVertex = new PmxVertexData
+			{
+				Pos = pos ,
+				Uv = uv ,
+				BoneId = new int[] { 1 },
+			};
+			return pmxVertex;
+		}
+
+		List<PmxVertexData> CreateVert()
+		{
+			List<PmxVertexData> temp = new List<PmxVertexData>( );
+			for ( int i = 0 ; i < Vertexs.Count ; i++ )
+			{
+				temp.Add( MakeVert( Vertexs[ i ] , UVs[ i ] ) );
+			}
+			return temp;
+		}
+
+		public void DebugRect(string path)
+		{
+			using ( FileStream sr = new FileStream( path , FileMode.Open , FileAccess.Read ) )
+			{
+				using ( BinaryReader bin = new BinaryReader( sr ) )
+				{
+					var pmxModelData = new PmxModelData( bin );
+					//Path = path;
+					//PmxModelData.Write( path + "ex.pmx" );
+					var vert = pmxModelData.VertexArray.Select( v => v.Pos.ToV3( ) ).ToList( );
+					var uv = pmxModelData.VertexArray.Select( v => v.Uv ).ToList( );
+					var faceGr = pmxModelData.VertexIndices.ToList( );
+					string parent = Directory.GetParent( path ).FullName;
+					var option = new AdaptiveOptionsCs( 1 );
+					option.UseInfSharpPatch = true;
+					option.UseSingleCreasePatch = true;
+					// far_tutorial_6 がパラメトリックにずらす
+					// far_tutorial_3 uvなど
+					using ( var refi = new Refiner( vert , faceGr , 3 ) )
+					{
+						refi.AddChannel( new FVarChannelCs( faceGr , uv.Count ) );
+						for ( int i = 0 ; i < uv.Count ; i++ )
+						{
+							refi.SetUV( uv[ i ].X , uv[ i ].Y );
+						}
+						refi.AddOption( option );
+						refi.OnFace = OnFace;
+						refi.OnUV = OnUV;
+						refi.OnVert = OnVert;
+						refi.DoRefine( );
+					}
+
+					pmxModelData.VertexArray = CreateVert( ).ToArray( );
+					pmxModelData.MaterialArray[ 0 ].FaceCount = Faces.Count;
+					// boneid と materialは仮
+					pmxModelData.VertexIndices = Faces.ToArray( );
+					pmxModelData.Write( path + "ex.pmx" );
+				}
+			}
+		}
+	}
+
 	class Program
 	{
 		public static IEnumerable<Vec3> ParseCSV( IEnumerable<string> lines )
@@ -45,10 +136,19 @@ static int g_vertIndices[24] = { 0, 1, 3, 2,
 			}
 		}
 
+
+
 		static void Main( string[] args )
 		{
+#if true
+			RefineMMD refine = new RefineMMD();
+			var path = "debugRect.pmx";
+			refine.DebugRect( path );
+			RefineMMD debugRef = new RefineMMD( );
+			debugRef.DebugRect( path + "ex.pmx" );
+#else
 			var exePath = AppDomain.CurrentDomain.BaseDirectory;
-			var path = "mikuCsv.csv";
+			var path = @"miku.csv";
 			string[] lines = File.ReadAllLines( path );
 			//;Face,親材質名,面Index,頂点Index1,頂点Index2,頂点Index3
 			//Face,"スカート腕ヘドフォン",0,858,840,855
@@ -59,6 +159,7 @@ static int g_vertIndices[24] = { 0, 1, 3, 2,
 			var Vertice = ParseCSV( gs[ "Vertex" ] ).ToList( );
 			var faceGr = //.GroupBy( s => s.Split( ',' )[ 1 ] ).ToDictionary( s => s.Key , g => g.ToList( ) );
 				Util.ParseFaceCSVAll( gs[ "Face" ] ).SelectMany(x=>x).ToList();
+
 			var verts = new List<Vec3> {
 				new Vec3( -0.5f , -0.5f , 0.5f ),
 				new Vec3( 0.5f , -0.5f , 0.5f ),
@@ -69,6 +170,7 @@ static int g_vertIndices[24] = { 0, 1, 3, 2,
 				new Vec3( -0.5f , -0.5f , -0.5f ),
 				new Vec3( 0.5f , -0.5f , -0.5f ),
 			};
+
 			var faces =	new List<int>
 				{ 0, 1, 3, 2,
 				 2, 3, 5, 4,
@@ -77,11 +179,17 @@ static int g_vertIndices[24] = { 0, 1, 3, 2,
 				 1, 7, 5, 3,
 				 6, 0, 2, 4 };
 
+			var option = new AdaptiveOptionsCs( 1 );
+			option.UseInfSharpPatch = true;
+			option.UseSingleCreasePatch = true;
+			// far_tutorial_6 がパラメトリックにずらす
+			// far_tutorial_3 uvなど
 			using ( var refi = new Refiner( Vertice , faceGr , 3 ) )
 			{
-
+				refi.AddOption( option );
 				refi.DoRefine( );
 			}
+#endif
 
 		}
 	}

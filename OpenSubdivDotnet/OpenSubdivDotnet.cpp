@@ -6,6 +6,8 @@ float M_PI = 3.141592f;
 //#include "far\topologyRefiner.h"
 #include "far\topologyDescriptor.h"
 #include "DescripterCs.h"
+#include "AdaptiveOptionsCs.h"
+#include "FVarChannelCs.h"
 
 #define and &&
 #define and_eq &=
@@ -34,10 +36,12 @@ public ref struct Vec3
     Y = y;
     Z = z;
   }
+
   virtual System::String ^ToString() override
   {
     return X.ToString() + " " + Y.ToString() + " " + Z.ToString();
   }
+
   float X;
   float Y;
   float Z;
@@ -80,6 +84,41 @@ private:
   float _position[3];
 };
 
+struct FVarVertexUV
+{
+
+  FVarVertexUV()
+  {
+    U = 0;
+    V = 0;
+  }
+
+  FVarVertexUV(float u, float v)
+  {
+    U = u;
+    V = v;
+  }
+
+  // Minimal required interface ----------------------
+  void Clear()
+  {
+    U = V = 0.0f;
+  }
+
+  void AddWithWeight(FVarVertexUV const & src, float weight) {
+    U += weight * src.U;
+    V += weight * src.V;
+  }
+  // Basic 'uv' layout channel
+  float U, V;
+};
+
+struct Mesh
+{
+  Vertex* Vertex;
+  FVarVertexUV* UV;
+};
+
 static float g_verts[8][3] = { { -0.5f, -0.5f,  0.5f },
                               {  0.5f, -0.5f,  0.5f },
                               { -0.5f,  0.5f,  0.5f },
@@ -108,7 +147,25 @@ internal:
 
   std::vector<Vertex*>* Verts ;
   DescripterCs^ PolyDesc;
+  AdaptiveOptionsCs^ Option;
+  List<FVarChannelCs^>^ FVarChannels;
+  std::vector<FVarVertexUV>* VertUV;
+
+  std::vector<Descriptor::FVarChannel> GetChannels()
+  {
+      std::vector<Descriptor::FVarChannel> varChannels( FVarChannels->Count );
+      for (size_t i = 0; i < FVarChannels->Count; i++)
+      {
+        varChannels[i] = (*FVarChannels)[i]->ToFVarChannel();
+      }
+      return varChannels;
+  }
+
   public:
+
+    Action<float, float, float>^ OnVert;
+    Action<int, int, int>^ OnFace;
+    Action<float, float>^ OnUV;
 
     void AddVert(float x, float y, float z)
     {
@@ -122,7 +179,22 @@ internal:
       PolyDesc = desc;
     }
 
-    void print(Far::TopologyRefiner * refiner, int level , Vertex* verts)
+    void AddOption(AdaptiveOptionsCs^ opt)
+    {
+      Option = opt;
+    }
+
+    void AddChannel(FVarChannelCs^ channel)
+    {
+      FVarChannels->Add(channel);
+    }
+
+    void SetUV(float u , float v)
+    {
+      VertUV->push_back(FVarVertexUV( u,v) );
+    }
+
+    void print(Far::TopologyRefiner * refiner, int level , Mesh mesh)
     {
       Far::TopologyLevel const & refLastLevel = refiner->GetLevel(level);
 
@@ -133,9 +205,28 @@ internal:
       int firstOfLastVerts = refiner->GetNumVerticesTotal() - nverts;
 
       for (int vert = 0; vert < nverts; ++vert) {
-        float const * pos = verts[firstOfLastVerts + vert].GetPosition();
+        float const * pos = mesh.Vertex[firstOfLastVerts + vert].GetPosition();
+        if (OnVert != nullptr)
+        {
+          OnVert( pos[0], pos[1], pos[2]);
+        }
         printf("v %f %f %f\n", pos[0], pos[1], pos[2]);
       }
+
+      // varChannels 0は uvとする
+      int channelUV = 0;
+        // Print uvs
+        int nuvs   = refLastLevel.GetNumFVarValues(channelUV);
+        int firstOfLastUvs = refiner->GetNumFVarValuesTotal(channelUV) - nuvs;
+        for (int fvvert = 0; fvvert < nuvs; ++fvvert)
+        {
+            FVarVertexUV const & uv = mesh.UV[firstOfLastUvs + fvvert];
+            if (OnUV != nullptr)
+            {
+              OnUV(uv.U, uv.V);
+            }
+            printf("vt %f %f\n", uv.U, uv.V);
+        }
 
       // Print faces
       for (int face = 0; face < nfaces; ++face)
@@ -155,6 +246,11 @@ internal:
 #endif
         printf("f %d %d %d\n", fverts[0] + 1 , fverts[1] + 1 , fverts[2] + 1 );
         printf("f %d %d %d"  , fverts[0] + 1 , fverts[2] + 1 , fverts[3] + 1 );
+        if (OnFace != nullptr)
+        {
+          OnFace(fverts[0] , fverts[1] , fverts[2] );
+          OnFace(fverts[0] , fverts[2] , fverts[3] );
+        }
         printf("\n");
       }
     }
@@ -170,42 +266,67 @@ internal:
       options.SetTriangleSubdivision(Sdc::Options::TriangleSubdivision::TRI_SUB_SMOOTH);
       Descriptor desc = *PolyDesc->desc;
 
+      std::vector<Descriptor::FVarChannel> varChannels = GetChannels();
+
+      desc.fvarChannels    = varChannels.data();
+      desc.numFVarChannels = varChannels.size();
+
       // Instantiate a FarTopologyRefiner from the descriptor
       Far::TopologyRefiner * refiner = Far::TopologyRefinerFactory<Descriptor>::Create(desc,
         Far::TopologyRefinerFactory<Descriptor>::Options(type, options));
 
-      int maxlevel = 1;
-
+      TopologyRefiner::AdaptiveOptions option = Option->ToAdaptiveOptions();
       // Uniformly refine the topology up to 'maxlevel'
-      //refiner->RefineUniform(Far::TopologyRefiner::UniformOptions(maxlevel));
-      // レベル以外にも設定できる
-      refiner->RefineAdaptive(Far::TopologyRefiner::AdaptiveOptions(maxlevel));
+
+      refiner->RefineAdaptive( option );
       // 最大レベルリファインした頂点+元頂点合計分バッファーを作る
       // Allocate a buffer for vertex primvar data. The buffer length is set to
       // be the sum of all children vertices up to the highest level of refinement.
       std::vector<Vertex> vbuffer(refiner->GetNumVerticesTotal());
       Vertex * verts = &vbuffer[0];
 
-
       // 座標を登録
       int nCoarseVerts = desc.numVertices;
-      for (int i = 0; i < nCoarseVerts; ++i) {
+      for (int i = 0; i < nCoarseVerts; ++i)
+      {
         auto v = (*Verts)[i]->GetPosition();
         verts[i].SetPosition(v[0], v[1], v[2]);
       }
 
+      // varChannels 0は uvとする
+      int channelUV = 0;
+
+      // fvBufferUV にuvを登録
+      auto uvs = refiner->GetNumFVarValuesTotal(channelUV);
+      std::vector<FVarVertexUV> fvBufferUV( uvs );
+      FVarVertexUV* fvVertsUV = &fvBufferUV[0];
+      for (int i = 0; i < VertUV->size(); ++i)
+      {
+        fvVertsUV[i].U = (*VertUV)[i].U;
+        fvVertsUV[i].V = (*VertUV)[i].V;
+      }
 
       // Interpolate vertex primvar data
       Far::PrimvarRefiner primvarRefiner(*refiner);
 
       // 前のレベルに足す形で頂点をリファイン
       Vertex * src = verts;
-      for (int level = 1; level <= maxlevel; ++level) {
+      FVarVertexUV *    srcFVarUV = fvVertsUV;
+      for (int level = 1; level <= option.isolationLevel ; ++level)
+      {
         Vertex * dst = src + refiner->GetLevel(level - 1).GetNumVertices();
+        FVarVertexUV * dstFVarUV = srcFVarUV + refiner->GetLevel(level-1).GetNumFVarValues(channelUV);
+
         primvarRefiner.Interpolate(level, src, dst);
+        primvarRefiner.InterpolateFaceVarying(level, srcFVarUV , dstFVarUV, channelUV);
         src = dst;
+        srcFVarUV = dstFVarUV;
       }
-      print(refiner, maxlevel,verts);
+
+      Mesh mesh;
+      mesh.Vertex = verts;
+      mesh.UV = fvVertsUV;
+      print(refiner, option.isolationLevel , mesh);
     }
 
     Refiner()
@@ -222,6 +343,9 @@ internal:
         AddVert(v->X, v->Y, v->Z);
       }
       PolyDesc = ( gcnew DescripterCs(vert->Count, ind->Count / faces , ind , faces ) );
+      Option = gcnew AdaptiveOptionsCs(1);
+      FVarChannels = gcnew List<FVarChannelCs^>();
+      VertUV = new std::vector<FVarVertexUV>();
     }
 
     ~Refiner()
@@ -233,6 +357,9 @@ internal:
       }
       delete Verts;
       PolyDesc->~DescripterCs();
+      Option->~AdaptiveOptionsCs();
+      delete FVarChannels;
+      delete VertUV;
       printf("refine release");
     }
 

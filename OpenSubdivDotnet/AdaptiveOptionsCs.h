@@ -1,7 +1,18 @@
 #pragma once
-ref class AdaptiveOptionsCs
+#include "far\topologyRefiner.h"
+using namespace OpenSubdiv::Far;
+
+public ref struct AdaptiveOptionsCs
 {
+  unsigned short IsolationLevel;
+  unsigned short SecondaryLevel;
+  bool UseSingleCreasePatch;
+  bool UseInfSharpPatch;
+  bool ConsiderFVarChannels;
+  bool OrderVerticesFromFacesFirst;
 public:
-  AdaptiveOptionsCs();
+  AdaptiveOptionsCs(unsigned short isolationLevel);
+  ~AdaptiveOptionsCs();
+  TopologyRefiner::AdaptiveOptions ToAdaptiveOptions();
 };
 
