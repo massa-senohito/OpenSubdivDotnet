@@ -41,6 +41,14 @@ static int g_vertIndices[24] = { 0, 1, 3, 2,
 
 		List<int> VertOffset = new List<int>( );
 
+		void Init()
+		{
+			Vertexs.Clear( );
+			Faces.Clear( );
+			UVs.Clear( );
+			VertOffset.Clear( );
+		}
+
 		void OnVert( float x , float y , float z )
 		{
 			Vertexs.Add( new Vector3( x , y , z ) );
@@ -79,6 +87,26 @@ static int g_vertIndices[24] = { 0, 1, 3, 2,
 			return temp;
 		}
 
+		void refin( List<Vec3> vert , List<int> faceGr , List<Vector2> uv , AdaptiveOptionsCs option )
+		{
+
+			Init( );
+
+			using ( var refi = new Refiner( vert , faceGr , 3 ) )
+			{
+				refi.AddChannel( new FVarChannelCs( faceGr , uv.Count ) );
+				for ( int i = 0 ; i < uv.Count ; i++ )
+				{
+					refi.SetUV( uv[ i ].X , uv[ i ].Y );
+				}
+				refi.AddOption( option );
+				refi.OnFace = OnFace;
+				refi.OnUV = OnUV;
+				refi.OnVert = OnVert;
+				refi.DoRefine( );
+			}
+		}
+
 		public void DebugRect(string path)
 		{
 			using ( FileStream sr = new FileStream( path , FileMode.Open , FileAccess.Read ) )
@@ -90,32 +118,48 @@ static int g_vertIndices[24] = { 0, 1, 3, 2,
 					//PmxModelData.Write( path + "ex.pmx" );
 					var vert = pmxModelData.VertexArray.Select( v => v.Pos.ToV3( ) ).ToList( );
 					var uv = pmxModelData.VertexArray.Select( v => v.Uv ).ToList( );
-					var faceGr = pmxModelData.VertexIndices.ToList( );
+					List<int> faceGr = pmxModelData.VertexIndices.ToList( );
+					PmxMaterialData[] materialArray = pmxModelData.MaterialArray;
 					string parent = Directory.GetParent( path ).FullName;
 					var option = new AdaptiveOptionsCs( 1 );
 					option.UseInfSharpPatch = true;
 					option.UseSingleCreasePatch = true;
+#if false
 					// far_tutorial_6 がパラメトリックにずらす
 					// far_tutorial_3 uvなど
-					using ( var refi = new Refiner( vert , faceGr , 3 ) )
-					{
-						refi.AddChannel( new FVarChannelCs( faceGr , uv.Count ) );
-						for ( int i = 0 ; i < uv.Count ; i++ )
-						{
-							refi.SetUV( uv[ i ].X , uv[ i ].Y );
-						}
-						refi.AddOption( option );
-						refi.OnFace = OnFace;
-						refi.OnUV = OnUV;
-						refi.OnVert = OnVert;
-						refi.DoRefine( );
-					}
+						refin( vert , faceGr,uv, option );
+
 
 					pmxModelData.VertexArray = CreateVert( ).ToArray( );
-					pmxModelData.MaterialArray[ 0 ].FaceCount = Faces.Count;
+					// VertexIndices と同じ
+					materialArray[ 0 ].FaceCount = Faces.Count;
 					// boneid と materialは仮
 					pmxModelData.VertexIndices = Faces.ToArray( );
 					pmxModelData.Write( path + "ex.pmx" );
+#else
+					int currentFaces = 0;
+					int refinedVerts = 0;
+					var refinedVertice = new List<PmxVertexData>( );
+					var inds = new List<int>( );
+					for ( int i = 0 ; i < materialArray.Length ; i++ )
+					{
+						int faces = materialArray[ i ].FaceCount;
+						var havingFaces = faceGr.Range( currentFaces , faces ).ToList( );
+						var uvInMat = havingFaces.Select( ind => uv[ ind ] ).ToList( );
+						refin( vert , havingFaces ,uvInMat, option );
+						materialArray[ i ].FaceCount = Faces.Count;
+						refinedVertice.AddRange( CreateVert( ) );
+						inds.AddRange( Faces.Select(x=>x+refinedVerts) );
+						refinedVerts += refinedVertice.Count;
+						currentFaces += faces ;
+
+					}
+					pmxModelData.VertexArray = refinedVertice.ToArray();
+					// VertexIndices と同じ
+					// boneid と materialは仮
+					pmxModelData.VertexIndices = inds.ToArray( );
+					pmxModelData.Write( path + "ex.pmx" );
+#endif
 				}
 			}
 		}
@@ -142,10 +186,10 @@ static int g_vertIndices[24] = { 0, 1, 3, 2,
 		{
 #if true
 			RefineMMD refine = new RefineMMD();
-			var path = "debugRect.pmx";
+			var path = "debugCube.pmx";//ex.pmx";
 			refine.DebugRect( path );
-			RefineMMD debugRef = new RefineMMD( );
-			debugRef.DebugRect( path + "ex.pmx" );
+			//RefineMMD debugRef = new RefineMMD( );
+			//debugRef.DebugRect( path + "ex.pmx" );
 #else
 			var exePath = AppDomain.CurrentDomain.BaseDirectory;
 			var path = @"miku.csv";

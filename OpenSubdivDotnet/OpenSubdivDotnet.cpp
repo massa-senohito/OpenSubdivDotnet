@@ -58,7 +58,11 @@ struct Vertex {
     _position[1] = src._position[1];
     _position[2] = src._position[2];
   }
-
+  Vertex(float x , float y , float z) {
+    _position[0] = x;
+    _position[1] = y;
+    _position[2] = z;
+  }
   void Clear(void * = 0) {
     _position[0] = _position[1] = _position[2] = 0.0f;
   }
@@ -167,13 +171,6 @@ internal:
     Action<int, int, int>^ OnFace;
     Action<float, float>^ OnUV;
 
-    void AddVert(float x, float y, float z)
-    {
-      Vertex* v = new Vertex();
-      v->SetPosition(x, y, z);
-      Verts->push_back(v);
-    }
-
     void AddDesc(DescripterCs^ desc)
     {
       PolyDesc = desc;
@@ -270,10 +267,9 @@ internal:
 
       desc.fvarChannels    = varChannels.data();
       desc.numFVarChannels = varChannels.size();
-
+      auto inOpt = Far::TopologyRefinerFactory<Descriptor>::Options(type, options);
       // Instantiate a FarTopologyRefiner from the descriptor
-      Far::TopologyRefiner * refiner = Far::TopologyRefinerFactory<Descriptor>::Create(desc,
-        Far::TopologyRefinerFactory<Descriptor>::Options(type, options));
+      Far::TopologyRefiner * refiner = Far::TopologyRefinerFactory<Descriptor>::Create(desc , inOpt );
 
       TopologyRefiner::AdaptiveOptions option = Option->ToAdaptiveOptions();
       // Uniformly refine the topology up to 'maxlevel'
@@ -315,12 +311,15 @@ internal:
       for (int level = 1; level <= option.isolationLevel ; ++level)
       {
         Vertex * dst = src + refiner->GetLevel(level - 1).GetNumVertices();
-        FVarVertexUV * dstFVarUV = srcFVarUV + refiner->GetLevel(level-1).GetNumFVarValues(channelUV);
 
         primvarRefiner.Interpolate(level, src, dst);
-        primvarRefiner.InterpolateFaceVarying(level, srcFVarUV , dstFVarUV, channelUV);
         src = dst;
+#if UVRefine
+        auto p = refiner->GetLevel(level - 1).GetNumFVarValues(channelUV);
+        FVarVertexUV * dstFVarUV = srcFVarUV + p;
+        primvarRefiner.InterpolateFaceVarying(level, srcFVarUV , dstFVarUV, channelUV);
         srcFVarUV = dstFVarUV;
+#endif
       }
 
       Mesh mesh;
@@ -329,20 +328,16 @@ internal:
       print(refiner, option.isolationLevel , mesh);
     }
 
-    Refiner()
-    {
-      Verts = new std::vector<Vertex*>();
-    }
 
     Refiner(List<TexturedVert^>^ vert, List<int>^ ind , int faces)
     {
-      Verts = new std::vector<Vertex*>();
+      Verts = new std::vector<Vertex*>( vert->Count );
       for (size_t i = 0; i < vert->Count; i++)
       {
         auto v = vert[i];
-        AddVert(v->X, v->Y, v->Z);
+        (*Verts)[i] = new Vertex(v->X, v->Y, v->Z);
       }
-      PolyDesc = ( gcnew DescripterCs(vert->Count, ind->Count / faces , ind , faces ) );
+      PolyDesc = ( gcnew DescripterCs( vert->Count , ind->Count / faces , ind , faces ) );
       Option = gcnew AdaptiveOptionsCs(1);
       FVarChannels = gcnew List<FVarChannelCs^>();
       VertUV = new std::vector<FVarVertexUV>();
