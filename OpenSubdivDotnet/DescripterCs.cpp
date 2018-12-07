@@ -29,7 +29,7 @@ void DescripterCs::Create(int verts, int faces, const Far::Index* ind , int vert
   desc->numFaces = faces;
   // 4–Ê‚ª‚È‚¢‚Ì‚Å
   VertPerFaces = new int[faces];
-  for (size_t i = 0; i < faces; i++)
+  for (int i = 0; i < faces; i++)
   {
     VertPerFaces[i] = vertsByFace;
   }
@@ -46,7 +46,7 @@ DescripterCs::DescripterCs(int verts, int faces, List<int>^ ind , int vertsByFac
 {
   //auto indArray = std::vector<std::unique_ptr<int> >( ind->Count );
   IndArray = new std::vector< int >( ind->Count );
-  for (size_t i = 0; i < ind->Count ; i++)
+  for (int i = 0; i < ind->Count ; i++)
   {
     //indArray[i].reset( new int(ind[i]) );
     (*IndArray)[i] = ind[i];
@@ -57,7 +57,13 @@ DescripterCs::DescripterCs(int verts, int faces, List<int>^ ind , int vertsByFac
 
 DescripterCs::~DescripterCs()
 {
-  printf("release desc");
+  this->!DescripterCs();
+}
+
+DescripterCs::!DescripterCs()
+{
+  printf("release desc\n");
   delete[] VertPerFaces;
   delete IndArray;
+  delete desc;
 }

@@ -40,7 +40,12 @@ AdaptiveOptionsCs::AdaptiveOptionsCs(unsigned short isolationLevel)
 
 AdaptiveOptionsCs::~AdaptiveOptionsCs()
 {
-  printf("AdaptiveOptionsCs released\n");
+  this->!AdaptiveOptionsCs();
+}
+
+AdaptiveOptionsCs::!AdaptiveOptionsCs()
+{
+  printf("released AdaptiveOptionsCs \n");
 }
 
 TopologyRefiner::AdaptiveOptions AdaptiveOptionsCs::ToAdaptiveOptions()

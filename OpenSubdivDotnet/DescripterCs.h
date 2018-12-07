@@ -16,5 +16,6 @@ public:
   DescripterCs::DescripterCs(int verts, int faces, const Far::Index* ind);
   DescripterCs::DescripterCs(int verts, int faces, List<int>^ ind , int vertsByFace );
   ~DescripterCs();
+  !DescripterCs();
 };
 

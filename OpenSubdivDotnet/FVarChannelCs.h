@@ -13,6 +13,7 @@ public ref class FVarChannelCs
 public:
   FVarChannelCs(List<int>^ ind , int uniqueIndiceCount);
   ~FVarChannelCs();
+  !FVarChannelCs();
   Descriptor::FVarChannel ToFVarChannel();
 };
 

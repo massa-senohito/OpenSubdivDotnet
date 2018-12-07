@@ -20,6 +20,7 @@ float M_PI = 3.141592f;
 #define or_eq |=
 #define xor ^
 #define xor_eq ^=
+#include <crtdbg.h>  
 
 //#include <osd/cpuEvaluator.h>
 
@@ -37,6 +38,16 @@ public ref struct Vec3
     Z = z;
   }
 
+  ~Vec3()
+  {
+    this->!Vec3();
+  }
+
+  !Vec3()
+  {
+    Console::WriteLine("release Vec3");
+  }
+
   virtual System::String ^ToString() override
   {
     return X.ToString() + " " + Y.ToString() + " " + Z.ToString();
@@ -46,6 +57,7 @@ public ref struct Vec3
   float Y;
   float Z;
 };
+
 using TexturedVert = Vec3;
 
 struct Vertex {
@@ -58,11 +70,18 @@ struct Vertex {
     _position[1] = src._position[1];
     _position[2] = src._position[2];
   }
+
   Vertex(float x , float y , float z) {
     _position[0] = x;
     _position[1] = y;
     _position[2] = z;
   }
+
+  ~Vertex()
+  {
+    //Console::WriteLine("release Vertex");
+  }
+
   void Clear(void * = 0) {
     _position[0] = _position[1] = _position[2] = 0.0f;
   }
@@ -95,6 +114,11 @@ struct FVarVertexUV
   {
     U = 0;
     V = 0;
+  }
+  
+  ~FVarVertexUV()
+  {
+    //Console::WriteLine("release FVarVertexUV");
   }
 
   FVarVertexUV(float u, float v)
@@ -158,7 +182,7 @@ internal:
   std::vector<Descriptor::FVarChannel> GetChannels()
   {
       std::vector<Descriptor::FVarChannel> varChannels( FVarChannels->Count );
-      for (size_t i = 0; i < FVarChannels->Count; i++)
+      for (int i = 0; i < FVarChannels->Count; i++)
       {
         varChannels[i] = (*FVarChannels)[i]->ToFVarChannel();
       }
@@ -264,12 +288,12 @@ internal:
       Descriptor desc = *PolyDesc->desc;
 
       std::vector<Descriptor::FVarChannel> varChannels = GetChannels();
-
       desc.fvarChannels    = varChannels.data();
       desc.numFVarChannels = varChannels.size();
       auto inOpt = Far::TopologyRefinerFactory<Descriptor>::Options(type, options);
       // Instantiate a FarTopologyRefiner from the descriptor
-      Far::TopologyRefiner * refiner = Far::TopologyRefinerFactory<Descriptor>::Create(desc , inOpt );
+      auto refiner = std::unique_ptr<Far::TopologyRefiner>
+         ( Far::TopologyRefinerFactory<Descriptor>::Create(desc , inOpt ) );
 
       TopologyRefiner::AdaptiveOptions option = Option->ToAdaptiveOptions();
       // Uniformly refine the topology up to 'maxlevel'
@@ -296,7 +320,7 @@ internal:
       auto uvs = refiner->GetNumFVarValuesTotal(channelUV);
       std::vector<FVarVertexUV> fvBufferUV( uvs );
       FVarVertexUV* fvVertsUV = &fvBufferUV[0];
-      for (int i = 0; i < VertUV->size(); ++i)
+      for (size_t i = 0; i < VertUV->size(); ++i)
       {
         fvVertsUV[i].U = (*VertUV)[i].U;
         fvVertsUV[i].V = (*VertUV)[i].V;
@@ -308,7 +332,7 @@ internal:
       // 前のレベルに足す形で頂点をリファイン
       Vertex * src = verts;
       FVarVertexUV *    srcFVarUV = fvVertsUV;
-      for (int level = 1; level <= option.isolationLevel ; ++level)
+      for (unsigned int level = 1; level <= option.isolationLevel ; ++level)
       {
         Vertex * dst = src + refiner->GetLevel(level - 1).GetNumVertices();
 
@@ -325,25 +349,32 @@ internal:
       Mesh mesh;
       mesh.Vertex = verts;
       mesh.UV = fvVertsUV;
-      print(refiner, option.isolationLevel , mesh);
+      print( refiner.get() , option.isolationLevel , mesh);
     }
 
 
     Refiner(List<TexturedVert^>^ vert, List<int>^ ind , int faces)
     {
+      _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
+
       Verts = new std::vector<Vertex*>( vert->Count );
-      for (size_t i = 0; i < vert->Count; i++)
+      for (int i = 0; i < vert->Count; i++)
       {
         auto v = vert[i];
         (*Verts)[i] = new Vertex(v->X, v->Y, v->Z);
       }
-      PolyDesc = ( gcnew DescripterCs( vert->Count , ind->Count / faces , ind , faces ) );
+      PolyDesc = gcnew DescripterCs( vert->Count , ind->Count / faces , ind , faces );
       Option = gcnew AdaptiveOptionsCs(1);
       FVarChannels = gcnew List<FVarChannelCs^>();
       VertUV = new std::vector<FVarVertexUV>();
     }
 
     ~Refiner()
+    {
+      this->!Refiner();
+    }
+
+    !Refiner()
     {
       for (size_t i = 0; i < Verts->size() ; i++)
       {
@@ -357,6 +388,7 @@ internal:
       delete VertUV;
       printf("refine release");
     }
+
 
   static void R()
   {
@@ -383,8 +415,8 @@ internal:
 
 
     // Instantiate a FarTopologyRefiner from the descriptor
-    Far::TopologyRefiner * refiner = Far::TopologyRefinerFactory<Descriptor>::Create(desc,
-      Far::TopologyRefinerFactory<Descriptor>::Options(type, options));
+    auto refiner = std::unique_ptr<Far::TopologyRefiner>( Far::TopologyRefinerFactory<Descriptor>::Create(desc,
+      Far::TopologyRefinerFactory<Descriptor>::Options(type, options)) );
 
     int maxlevel = 3;
 
@@ -416,7 +448,6 @@ internal:
       primvarRefiner.Interpolate(level, src, dst);
       src = dst;
     }
-
 
     { // Output OBJ of the highest level refined -----------
 
@@ -461,6 +492,7 @@ internal:
 
 int main(array<System::String ^> ^args)
 {
+      _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF | _CRTDBG_CHECK_ALWAYS_DF);
   Refiner::R();
     //Console::WriteLine(L"Hello World");
     return 0;

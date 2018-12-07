@@ -13,6 +13,7 @@ public ref struct AdaptiveOptionsCs
 public:
   AdaptiveOptionsCs(unsigned short isolationLevel);
   ~AdaptiveOptionsCs();
+  !AdaptiveOptionsCs();
   TopologyRefiner::AdaptiveOptions ToAdaptiveOptions();
 };
 

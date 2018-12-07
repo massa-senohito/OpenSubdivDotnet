@@ -7,7 +7,7 @@ FVarChannelCs::FVarChannelCs( List<int>^ ind , int uniqueIndiceCount)
   Inds = ind;
   UniqueIndiceCount = uniqueIndiceCount;
   IndArray = new std::vector< int >(ind->Count);
-  for (size_t i = 0; i < ind->Count; i++)
+  for (int i = 0; i < ind->Count; i++)
   {
     (*IndArray)[i] = Inds[i];
   }
@@ -16,6 +16,12 @@ FVarChannelCs::FVarChannelCs( List<int>^ ind , int uniqueIndiceCount)
 
 FVarChannelCs::~FVarChannelCs()
 {
+  this->!FVarChannelCs();
+}
+
+FVarChannelCs::!FVarChannelCs()
+{
+  printf("release FVarChannel\n");
   delete IndArray;
 }
 
