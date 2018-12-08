@@ -107,6 +107,12 @@ namespace SharpDXTest
 		{
 			return new Vec3( v.X , v.Y , v.Z );
 		}
+
+		public static Vector3 ToSharpV3(this Vec3 v )
+		{
+			return new Vector3( v.X , v.Y , v.Z );
+		}
+
 		public static float Sin( float f )
 		{
 			return ( float )Math.Sin( f );

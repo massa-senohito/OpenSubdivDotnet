@@ -138,19 +138,34 @@ static int g_vertIndices[24] = { 0, 1, 3, 2,
 					pmxModelData.Write( path + "ex.pmx" );
 #else
 					int currentFaces = 0;
-					int refinedVerts = 0;
+					int refinedVertsCount = 0;
 					var refinedVertice = new List<PmxVertexData>( );
 					var inds = new List<int>( );
+					var refineTargets = new List<int> { 0 , 1 //, 2 , 5 , 8 , 9
+					};
 					for ( int i = 0 ; i < materialArray.Length ; i++ )
 					{
 						int faces = materialArray[ i ].FaceCount;
 						var havingFaces = faceGr.Range( currentFaces , faces ).ToList( );
+						// リファインしないならもとの頂点のまま入れる
+						if ( !refineTargets.Contains( i ) )
+						{
+							var matVertice = havingFaces.Distinct().Select( ind => vert[ ind ] ).Select( v => MakeVert( v.ToSharpV3( ) , Vector2.Zero ) );
+							currentFaces += faces;
+							refinedVertice.AddRange( matVertice );
+							// 合計して増えた頂点数分オフセットすれば
+							inds.AddRange( havingFaces// );//
+								.Select( x => x + 60) );
+							refinedVertsCount += matVertice.Count( );
+							continue;
+						}
 						var uvInMat = havingFaces.Select( ind => uv[ ind ] ).ToList( );
 						refin( vert , havingFaces ,uvInMat, option );
 						materialArray[ i ].FaceCount = Faces.Count;
-						refinedVertice.AddRange( CreateVert( ) );
-						inds.AddRange( Faces.Select(x=>x+refinedVerts) );
-						refinedVerts += refinedVertice.Count;
+						List<PmxVertexData> createdVert = CreateVert( );
+						refinedVertice.AddRange( createdVert );
+						inds.AddRange( Faces.Select( x => x + refinedVertsCount ) );
+						refinedVertsCount += createdVert.Count;
 						currentFaces += faces ;
 
 					}
@@ -187,6 +202,7 @@ static int g_vertIndices[24] = { 0, 1, 3, 2,
 #if true
 			RefineMMD refine = new RefineMMD();
 			var path = "debugCube.pmx";//ex.pmx";
+
 			refine.DebugRect( path );
 			//RefineMMD debugRef = new RefineMMD( );
 			//debugRef.DebugRect( path + "ex.pmx" );
