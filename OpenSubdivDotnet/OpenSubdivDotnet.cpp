@@ -9,6 +9,8 @@ float M_PI = 3.141592f;
 #include "AdaptiveOptionsCs.h"
 #include "FVarChannelCs.h"
 
+#define UVRefine 1
+
 #define and &&
 #define and_eq &=
 #define bitand &
@@ -231,7 +233,7 @@ internal:
         {
           OnVert( pos[0], pos[1], pos[2]);
         }
-        printf("v %f %f %f\n", pos[0], pos[1], pos[2]);
+        //printf("v %f %f %f\n", pos[0], pos[1], pos[2]);
       }
 
       // varChannels 0は uvとする
@@ -246,7 +248,7 @@ internal:
             {
               OnUV(uv.U, uv.V);
             }
-            printf("vt %f %f\n", uv.U, uv.V);
+            //printf("vt %f %f\n", uv.U, uv.V);
         }
 
       // Print faces
@@ -265,8 +267,8 @@ internal:
           printf("%d ", fverts[vert] + 1); // OBJ uses 1-based arrays...
         }
 #endif
-        printf("f %d %d %d\n", fverts[0] + 1 , fverts[1] + 1 , fverts[2] + 1 );
-        printf("f %d %d %d"  , fverts[0] + 1 , fverts[2] + 1 , fverts[3] + 1 );
+        //printf("f %d %d %d\n", fverts[0] + 1 , fverts[1] + 1 , fverts[2] + 1 );
+        //printf("f %d %d %d"  , fverts[0] + 1 , fverts[2] + 1 , fverts[3] + 1 );
         if (OnFace != nullptr)
         {
           OnFace(fverts[0] , fverts[1] , fverts[2] );
@@ -302,7 +304,7 @@ internal:
       // 最大レベルリファインした頂点+元頂点合計分バッファーを作る
       // Allocate a buffer for vertex primvar data. The buffer length is set to
       // be the sum of all children vertices up to the highest level of refinement.
-      std::vector<Vertex> vbuffer(refiner->GetNumVerticesTotal());
+      std::vector<Vertex> vbuffer( refiner->GetNumVerticesTotal() );
       Vertex * verts = &vbuffer[0];
 
       // 座標を登録
@@ -317,17 +319,20 @@ internal:
       int channelUV = 0;
 
       // fvBufferUV にuvを登録
-      auto uvs = refiner->GetNumFVarValuesTotal(channelUV);
-      std::vector<FVarVertexUV> fvBufferUV( uvs );
+      auto uvsCount = refiner->GetNumFVarValuesTotal(channelUV);
+      std::vector<FVarVertexUV> fvBufferUV ( 
+        //refiner->GetNumVerticesTotal ( )
+        uvsCount
+      );
       FVarVertexUV* fvVertsUV = &fvBufferUV[0];
       for (size_t i = 0; i < VertUV->size(); ++i)
       {
-        fvVertsUV[i].U = (*VertUV)[i].U;
-        fvVertsUV[i].V = (*VertUV)[i].V;
+        fvVertsUV[ i ].U = ( *VertUV )[ i ].U;
+        fvVertsUV[ i ].V = ( *VertUV )[ i ].V;
       }
 
       // Interpolate vertex primvar data
-      Far::PrimvarRefiner primvarRefiner(*refiner);
+      Far::PrimvarRefiner primvarRefiner ( *refiner );
 
       // 前のレベルに足す形で頂点をリファイン
       Vertex * src = verts;
@@ -336,12 +341,12 @@ internal:
       {
         Vertex * dst = src + refiner->GetLevel(level - 1).GetNumVertices();
 
-        primvarRefiner.Interpolate(level, src, dst);
+        primvarRefiner.Interpolate ( level , src , dst );
         src = dst;
 #if UVRefine
-        auto p = refiner->GetLevel(level - 1).GetNumFVarValues(channelUV);
-        FVarVertexUV * dstFVarUV = srcFVarUV + p;
-        primvarRefiner.InterpolateFaceVarying(level, srcFVarUV , dstFVarUV, channelUV);
+        auto currentLevelUVCount = refiner->GetLevel ( level - 1 ).GetNumFVarValues ( channelUV );
+        FVarVertexUV * dstFVarUV = srcFVarUV + currentLevelUVCount;
+        primvarRefiner.InterpolateFaceVarying ( level , srcFVarUV , dstFVarUV , channelUV );
         srcFVarUV = dstFVarUV;
 #endif
       }
