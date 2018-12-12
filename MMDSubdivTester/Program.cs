@@ -123,8 +123,9 @@ static int g_vertIndices[24] = { 0, 1, 3, 2,
 					PmxMaterialData[] materialArray = pmxModelData.MaterialArray;
 					string parent = Directory.GetParent( path ).FullName;
 					var option = new AdaptiveOptionsCs( 1 );
-					option.UseInfSharpPatch = true;
-					option.UseSingleCreasePatch = true;
+					//option.UseInfSharpPatch = true;
+					//option.UseSingleCreasePatch = true;
+					option.ConsiderFVarChannels = true;
 #if false
 					// far_tutorial_6 がパラメトリックにずらす
 					// far_tutorial_3 uvなど

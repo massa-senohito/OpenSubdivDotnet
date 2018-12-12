@@ -286,21 +286,30 @@ internal:
       // エッジのみをシャープに、コーナーも含められる
       options.SetVtxBoundaryInterpolation(Sdc::Options::VTX_BOUNDARY_EDGE_ONLY);
       // 三角がスムースになるけど、つながらない面が出るかも 3角面しかmmdにないし、変に穴が開くので
-      options.SetTriangleSubdivision(Sdc::Options::TriangleSubdivision::TRI_SUB_SMOOTH);
+      //options.SetTriangleSubdivision(
+      //  Sdc::Options::TriangleSubdivision::TRI_SUB_SMOOTH
+      //);
+      options.SetFVarLinearInterpolation(Sdc::Options::FVAR_LINEAR_NONE);
       Descriptor desc = *PolyDesc->desc;
 
       std::vector<Descriptor::FVarChannel> varChannels = GetChannels();
       desc.fvarChannels    = varChannels.data();
       desc.numFVarChannels = varChannels.size();
+
       auto inOpt = Far::TopologyRefinerFactory<Descriptor>::Options(type, options);
       // Instantiate a FarTopologyRefiner from the descriptor
       auto refiner = std::unique_ptr<Far::TopologyRefiner>
          ( Far::TopologyRefinerFactory<Descriptor>::Create(desc , inOpt ) );
-
+#if Adaptive
       TopologyRefiner::AdaptiveOptions option = Option->ToAdaptiveOptions();
       // Uniformly refine the topology up to 'maxlevel'
 
       refiner->RefineAdaptive( option );
+#else
+      Far::TopologyRefiner::UniformOptions option(Option->IsolationLevel);
+      option.fullTopologyInLastLevel = true;
+      refiner->RefineUniform ( option );
+#endif
       // 最大レベルリファインした頂点+元頂点合計分バッファーを作る
       // Allocate a buffer for vertex primvar data. The buffer length is set to
       // be the sum of all children vertices up to the highest level of refinement.
@@ -337,7 +346,7 @@ internal:
       // 前のレベルに足す形で頂点をリファイン
       Vertex * src = verts;
       FVarVertexUV *    srcFVarUV = fvVertsUV;
-      for (unsigned int level = 1; level <= option.isolationLevel ; ++level)
+      for (unsigned int level = 1; level <= Option->IsolationLevel ; ++level)
       {
         Vertex * dst = src + refiner->GetLevel(level - 1).GetNumVertices();
 
@@ -354,7 +363,7 @@ internal:
       Mesh mesh;
       mesh.Vertex = verts;
       mesh.UV = fvVertsUV;
-      print( refiner.get() , option.isolationLevel , mesh);
+      print( refiner.get() , Option->IsolationLevel , mesh);
     }
 
 
