@@ -29,6 +29,8 @@ float M_PI = 3.141592f;
 using namespace OpenSubdiv;
 using namespace System;
 using Descriptor = Far::TopologyDescriptor;
+using TopoRefiner = Far::TopologyRefiner;
+using TopoFactory = TopologyRefinerFactory<Descriptor>;
 using namespace System::Collections::Generic;
 
 public ref struct Vec3
@@ -296,17 +298,17 @@ internal:
       desc.fvarChannels    = varChannels.data();
       desc.numFVarChannels = varChannels.size();
 
-      auto inOpt = Far::TopologyRefinerFactory<Descriptor>::Options(type, options);
+      TopoFactory::Options inOpt = TopoFactory::Options(type, options);
       // Instantiate a FarTopologyRefiner from the descriptor
-      auto refiner = std::unique_ptr<Far::TopologyRefiner>
-         ( Far::TopologyRefinerFactory<Descriptor>::Create(desc , inOpt ) );
+      std::unique_ptr<TopologyRefiner> refiner = std::unique_ptr<TopologyRefiner>
+         ( TopoFactory::Create(desc , inOpt ) );
 #if Adaptive
       TopologyRefiner::AdaptiveOptions option = Option->ToAdaptiveOptions();
       // Uniformly refine the topology up to 'maxlevel'
 
       refiner->RefineAdaptive( option );
 #else
-      Far::TopologyRefiner::UniformOptions option(Option->IsolationLevel);
+     TopologyRefiner::UniformOptions option(Option->IsolationLevel);
       option.fullTopologyInLastLevel = true;
       refiner->RefineUniform ( option );
 #endif
@@ -320,7 +322,7 @@ internal:
       int nCoarseVerts = desc.numVertices;
       for (int i = 0; i < nCoarseVerts; ++i)
       {
-        auto v = (*Verts)[i]->GetPosition();
+        const float* v = (*Verts)[i]->GetPosition();
         verts[i].SetPosition(v[0], v[1], v[2]);
       }
 
@@ -328,7 +330,7 @@ internal:
       int channelUV = 0;
 
       // fvBufferUV にuvを登録
-      auto uvsCount = refiner->GetNumFVarValuesTotal(channelUV);
+      int uvsCount = refiner->GetNumFVarValuesTotal(channelUV);
       std::vector<FVarVertexUV> fvBufferUV ( 
         //refiner->GetNumVerticesTotal ( )
         uvsCount
@@ -353,7 +355,7 @@ internal:
         primvarRefiner.Interpolate ( level , src , dst );
         src = dst;
 #if UVRefine
-        auto currentLevelUVCount = refiner->GetLevel ( level - 1 ).GetNumFVarValues ( channelUV );
+        int currentLevelUVCount = refiner->GetLevel ( level - 1 ).GetNumFVarValues ( channelUV );
         FVarVertexUV * dstFVarUV = srcFVarUV + currentLevelUVCount;
         primvarRefiner.InterpolateFaceVarying ( level , srcFVarUV , dstFVarUV , channelUV );
         srcFVarUV = dstFVarUV;
@@ -374,7 +376,7 @@ internal:
       Verts = new std::vector<Vertex*>( vert->Count );
       for (int i = 0; i < vert->Count; i++)
       {
-        auto v = vert[i];
+        TexturedVert^ v = vert[i];
         (*Verts)[i] = new Vertex(v->X, v->Y, v->Z);
       }
       PolyDesc = gcnew DescripterCs( vert->Count , ind->Count / faces , ind , faces );
@@ -388,6 +390,7 @@ internal:
       this->!Refiner();
     }
 
+    // GC , Dispose両方対応するため Finalizerで開放をさせる
     !Refiner()
     {
       for (size_t i = 0; i < Verts->size() ; i++)
@@ -404,7 +407,7 @@ internal:
     }
 
 
-  static void R()
+  static void TestRefine()
   {
     //http://graphics.pixar.com/opensubdiv/docs/far_tutorial_0.html
     //http://graphics.pixar.com/opensubdiv/docs/api_overview.html
@@ -429,13 +432,13 @@ internal:
 
 
     // Instantiate a FarTopologyRefiner from the descriptor
-    auto refiner = std::unique_ptr<Far::TopologyRefiner>( Far::TopologyRefinerFactory<Descriptor>::Create(desc,
-      Far::TopologyRefinerFactory<Descriptor>::Options(type, options)) );
+    std::unique_ptr<TopoRefiner> refiner = std::unique_ptr<TopoRefiner>( TopoFactory::Create(desc,
+      TopoFactory::Options(type, options)) );
 
     int maxlevel = 3;
 
     // Uniformly refine the topology up to 'maxlevel'
-    refiner->RefineUniform(Far::TopologyRefiner::UniformOptions(maxlevel));
+    refiner->RefineUniform(TopoRefiner::UniformOptions(maxlevel));
 
 
     // 最大レベルリファインした頂点+元頂点合計分バッファーを作る
@@ -502,12 +505,10 @@ internal:
   }
 };
 
-
-
 int main(array<System::String ^> ^args)
 {
-      _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF | _CRTDBG_CHECK_ALWAYS_DF);
-  Refiner::R();
+    _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF | _CRTDBG_CHECK_ALWAYS_DF);
+    Refiner::TestRefine();
     //Console::WriteLine(L"Hello World");
     return 0;
 }

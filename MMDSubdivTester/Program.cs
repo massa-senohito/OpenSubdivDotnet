@@ -180,7 +180,7 @@ static int g_vertIndices[24] = { 0, 1, 3, 2,
 					// VertexIndices と同じ
 					// boneid と materialは仮
 					pmxModelData.VertexIndices = inds.ToArray( );
-					pmxModelData.Write( path + "ex.pmx" );
+					pmxModelData.Write( path + "smo.pmx" );
 #endif
 				}
 			}
